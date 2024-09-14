@@ -12,6 +12,8 @@ import com.facebook.utitility.JwtUtil;
 
 import java.io.IOException;
 
+import java.util.Optional;
+
 @RestController
 @RequestMapping("/api/posts")
 public class PostController {
@@ -46,4 +48,59 @@ public class PostController {
 		return file.getOriginalFilename();
 
 	}
+
+	@DeleteMapping("/delete/{postId}")
+	public ResponseEntity<?> deletePost(@RequestHeader("Authorization") String token, @PathVariable Long postId) {
+		String jwtToken = token.replace("Bearer ", "");
+
+		// Assuming Post entity has the username to check against JWT
+		Post post = postService.getPostById(postId);
+
+		if (post != null && jwtUtil.validateToken(jwtToken, post.getUsername())) {
+			postService.deletePost(postId);
+			return ResponseEntity.ok("Post deleted successfully.");
+		} else {
+			return ResponseEntity.status(401).body("Unauthorized");
+		}
+	}
+
+	@PutMapping("/update/{postId}")
+	public ResponseEntity<Post> updatePost(@RequestHeader("Authorization") String token,
+			@RequestPart("post") Post postDetails,
+			@RequestPart(value = "image", required = false) MultipartFile imageFile, @PathVariable Long postId)
+			throws IOException {
+		String jwtToken = token.replace("Bearer ", "");
+
+		// Get existing post
+		Post existingPost = postService.getPostById(postId);
+
+		if (existingPost != null && jwtUtil.validateToken(jwtToken, existingPost.getUsername())) {
+			if (imageFile != null) {
+				String imagePath = getFileName(imageFile);
+				postDetails.setImage(imagePath);
+			}
+
+			// Update post details
+			Post updatedPost = postService.updatePost(postId, postDetails);
+			return ResponseEntity.ok(updatedPost);
+		} else {
+			return ResponseEntity.status(401).body(null);
+		}
+	}
+
+	@GetMapping("/user/{userId}")
+	public ResponseEntity<Optional<Post>> getPostsByUserId(@RequestHeader("Authorization") String token,
+			@PathVariable Long userId) {
+		String jwtToken = token.replace("Bearer ", "");
+
+		// Assuming the JWT token contains the username, and you can fetch posts by the
+		// user
+		if (jwtUtil.validateToken(jwtToken, jwtUtil.extractUsername(jwtToken))) {
+			Optional<Post> userPosts = postService.getPostsByUserId(userId);
+			return ResponseEntity.ok(userPosts);
+		} else {
+			return ResponseEntity.status(401).body(null);
+		}
+	}
+
 }
